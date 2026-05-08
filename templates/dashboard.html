@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vLLM Telemetry Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f6f8fc;
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            --border-color: #e9ecf4;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            
+            /* Curated Theme Accents */
+            --accent-primary: #6366f1; /* Indigo */
+            --accent-primary-light: rgba(99, 102, 241, 0.08);
+            --accent-purple: #a855f7;  /* Purple */
+            --accent-cyan: #06b6d4;    /* Cyan */
+            --accent-green: #10b981;   /* Emerald Green */
+            --accent-rose: #f43f5e;    /* Rose Red */
+            --accent-amber: #f59e0b;   /* Amber */
+            
+            /* KV Block State Palette */
+            --color-free: #f1f5f9;
+            --color-active-private: #c084fc;
+            --color-active-shared: #22d3ee;
+            --color-cached-shared: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
+        }
+
+        /* 1. Left Sidebar Navigation Panel */
+        .sidebar {
+            width: 260px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 36px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-purple) 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 18px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .logo-text h2 {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-text span {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-grow: 1;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background-color: var(--accent-primary-light);
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .profile-card {
+            background: #0f172a;
+            border-radius: 16px;
+            padding: 16px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .profile-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+            border-radius: 50%;
+        }
+
+        .profile-meta h4 {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .profile-meta p {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .cache-capacity {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .capacity-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .capacity-bar {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .capacity-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-cyan));
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        /* 2. Main Dashboard Content Area */
+        .main-content {
+            flex-grow: 1;
+            padding: 32px 40px;
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        /* Dashboard Top Header */
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h1 {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        .header-title p {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #ffffff;
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1;
+            transition: 0.3s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px; width: 14px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: var(--accent-primary); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        /* Premium White Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 6px 30px rgba(99, 102, 241, 0.05);
+        }
+
+        /* Stats Row Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .stat-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .icon-throughput { background: rgba(99, 102, 241, 0.1); color: var(--accent-primary); }
+        .icon-ttft { background: rgba(168, 85, 247, 0.1); color: var(--accent-purple); }
+        .icon-itl { background: rgba(6, 182, 212, 0.1); color: var(--accent-cyan); }
+        .icon-acceptance { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); }
+
+        .stat-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-val {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Fira Code', monospace;
+            color: var(--text-main);
+        }
+
+        .stat-subtext {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Playground Banner Section */
+        .banner-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(6, 182, 212, 0.03) 100%);
+            border-color: rgba(99, 102, 241, 0.12);
+        }
+
+        .playground-title {
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            color: var(--accent-primary);
+        }
+
+        .banner-flex {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .textarea-wrapper {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+            font-size: 14px;
+            color: var(--text-main);
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        textarea:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.1);
+        }
+
+        .playground-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+            text-align: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-outline {
+            background: #ffffff;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+
+        /* Dual Column Workspace Grid */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 7fr 5fr;
+            gap: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-main);
+        }
+
+        /* SVG Radix Tree Visualizer */
+        #radix-svg {
+            width: 100%;
+            height: 280px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tree-node {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .tree-node:hover {
+            filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.4));
+        }
+
+        .tree-link {
+            stroke: #e2e8f0;
+            stroke-width: 2;
+            fill: none;
+            transition: stroke 0.2s ease;
+        }
+
+        .tree-link.active {
+            stroke: var(--accent-cyan);
+            stroke-width: 3;
+            filter: drop-shadow(0 0 4px var(--accent-cyan));
+        }
+
+        /* KV Cache Memory block layout */
+        .mem-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 10px;
+        }
+
+        .mem-block {
+            aspect-ratio: 1.3;
+            background: var(--color-free);
+            border: 1px solid rgba(0,0,0,0.02);
+            border-radius: 8px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mem-block:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            border-color: rgba(0,0,0,0.1);
+        }
+
+        .mem-block-id {
+            font-family: 'Fira Code', monospace;
+            font-size: 9px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .mem-block-bar {
+            width: 100%;
+            height: 3px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .mem-block-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-primary);
+            border-radius: 2px;
+        }
+
+        /* KV block states */
+        .status-active-private { background: #faf5ff; border-color: rgba(192, 132, 252, 0.2); }
+        .status-active-private .mem-block-id { color: var(--accent-purple); }
+        .status-active-private .mem-block-fill { background: var(--accent-purple); width: 100%; }
+
+        .status-active-shared { background: #ecfeff; border-color: rgba(34, 211, 238, 0.2); }
+        .status-active-shared .mem-block-id { color: var(--accent-cyan); }
+        .status-active-shared .mem-block-fill { background: var(--accent-cyan); width: 100%; }
+
+        .status-cached-shared { background: #f8fafc; border-color: rgba(148, 163, 184, 0.2); }
+        .status-cached-shared .mem-block-id { color: #64748b; }
+        .status-cached-shared .mem-block-fill { background: #64748b; width: 100%; }
+
+        .legend-row {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+        /* Queue tables and lists */
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .queue-item {
+            border: 1px solid var(--border-color);
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .queue-meta { display: flex; align-items: center; gap: 8px; }
+        .queue-id { font-family: 'Fira Code', monospace; font-size: 12px; font-weight: 600; }
+        .badge {
+            padding: 1px 6px;
+            border-radius: 9999px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-waiting { background: #fef3c7; color: var(--accent-amber); }
+        .badge-prefilling { background: #e0e7ff; color: var(--accent-primary); }
+        .badge-running { background: #ecfeff; color: var(--accent-cyan); }
+        .badge-preempted { background: #ffe4e6; color: var(--accent-rose); }
+        .badge-completed { background: #d1fae5; color: var(--accent-green); }
+
+        .queue-stats { font-size: 11px; color: var(--text-muted); display: flex; gap: 12px; }
+        .queue-stats-val { font-family: 'Fira Code', monospace; color: var(--text-main); font-weight: 600; }
+
+        /* Terminal Console */
+        .terminal-card {
+            background: #090d16;
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            color: #475569;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .terminal-body {
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            height: 140px;
+            overflow-y: auto;
+            line-height: 1.6;
+            color: var(--accent-green);
+            white-space: pre-wrap;
+        }
+
+        /* Token rendering inside stream */
+        .token {
+            display: inline;
+            padding: 1px 2px;
+            border-radius: 3px;
+        }
+        .token-accepted { color: var(--accent-green); background: rgba(16, 185, 129, 0.06); border-bottom: 1px dotted rgba(16, 185, 129, 0.3); }
+        .token-rejected { color: var(--accent-rose); text-decoration: line-through; background: rgba(244, 63, 94, 0.06); }
+        .token-target { color: var(--accent-cyan); font-weight: 600; background: rgba(6, 182, 212, 0.06); }
+    </style>
+</head>
+<body>
+    <!-- 1. Left Sidebar Navigation -->
+    <div class="sidebar">
+        <div>
+            <div class="logo-section">
+                <div class="logo-icon">V</div>
+                <div class="logo-text">
+                    <h2>vLLM Console</h2>
+                    <span>Telemetry Engine</span>
+                </div>
+            </div>
+            
+            <div class="nav-menu">
+                <a class="nav-item active">Overview</a>
+                <a class="nav-item" href="/metrics" target="_blank">Prometheus Metrics</a>
+                <a class="nav-item" onclick="clearCompleted()">Clear History</a>
+            </div>
+        </div>
+
+        <div class="profile-card">
+            <div class="profile-info">
+                <div class="avatar"></div>
+                <div class="profile-meta">
+                    <h4>vLLM Simulator</h4>
+                    <p>Local Inference Node</p>
+                </div>
+            </div>
+            <div class="cache-capacity">
+                <div class="capacity-label">
+                    <span>KV Cache Pool</span>
+                    <span id="capacity-percentage">0%</span>
+                </div>
+                <div class="capacity-bar">
+                    <div class="capacity-fill" id="capacity-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Main Dashboard Content -->
+    <div class="main-content">
+        <div class="content-header">
+            <div class="header-title">
+                <h1>vLLM Telemetry Console</h1>
+                <p>Real-time analytics for continuous batching, radix prefix cache sharing, and speculative validation.</p>
+            </div>
+            
+            <div class="header-actions">
+                <div class="toggle-btn">
+                    <span>Speculative Decoding</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="spec-toggle" checked onchange="toggleSpeculative()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button class="btn btn-outline" onclick="clearCompleted()">Reset Stats</button>
+            </div>
+        </div>
+
+        <!-- Metric Cards -->
+        <div class="stats-row">
+            <div class="card stat-card">
+                <div class="stat-icon icon-throughput">🗂️</div>
+                <div class="stat-info">
+                    <span class="stat-label">Served requests</span>
+                    <span class="stat-val" id="stat-completed">0</span>
+                    <span class="stat-subtext">Completed queries</span>
+                </div>
+            </div>
+            
+            <div class="card stat-card">
+                <div class="stat-icon icon-ttft">⚡</div>
+                <div class="stat-info">
+                    <span class="stat-label">Average TTFT</span>
+                    <span class="stat-val" id="stat-ttft">0.0 ms</span>
+                    <span class="stat-subtext">Time-to-First-Token</span>
+                </div>
+            </div>
+
+            <div class="card stat-card">
+                <div class="stat-icon icon-itl">⏱️</div>
+                <div class="stat-info">
+                    <span class="stat-label">Average ITL</span>
+                    <span class="stat-val" id="stat-itl">0.0 ms</span>
+                    <span class="stat-subtext">Inter-Token Latency</span>
+                </div>
+            </div>
+
+            <div class="card stat-card">
+                <div class="stat-icon icon-acceptance">📈</div>
+                <div class="stat-info">
+                    <span class="stat-label">Draft Acceptance</span>
+                    <span class="stat-val" id="stat-acceptance">0.0%</span>
+                    <span class="stat-subtext">Speculative hit rate</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Playground Banner -->
+        <div class="card banner-card">
+            <div class="playground-title">Run Serving Playground</div>
+            <div class="banner-flex">
+                <div class="textarea-wrapper">
+                    <textarea id="prompt-input" placeholder="Type prompt sequence here... (e.g. 'System: You are an coding assistant.\nUser: write a merge sort')"></textarea>
+                </div>
+                <div class="playground-actions">
+                    <button class="btn" onclick="submitPrompt()">Submit request</button>
+                    <button class="btn btn-outline" onclick="simulateLoad()">Simulate Load</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workspace Grid Layout -->
+        <div class="workspace-grid">
+            <!-- Left Panel: KV Cache Map & Queue Monitor -->
+            <div class="left-column">
+                <!-- KV Cache Card -->
+                <div class="card">
+                    <div class="section-header">
+                        <span class="section-title">Physical KV Cache blocks</span>
+                        <div class="legend-row">
+                            <div class="legend-item" title="Free block inside KV cache manager">
+                                <div class="legend-dot" style="background-color: var(--color-free);"></div>
+                                <span>Free</span>
+                            </div>
+                            <div class="legend-item" title="Assigned exclusively to active generation request">
+                                <div class="legend-dot" style="background-color: var(--color-active-private);"></div>
+                                <span>Private Active</span>
+                            </div>
+                            <div class="legend-item" title="Referenced by active requests (Prefix caching hits)">
+                                <div class="legend-dot" style="background-color: var(--color-active-shared);"></div>
+                                <span>Shared Active</span>
+                            </div>
+                            <div class="legend-item" title="Saved in radix tree for future matches (Evictable)">
+                                <div class="legend-dot" style="background-color: var(--color-cached-shared);"></div>
+                                <span>Shared Cached</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mem-grid" id="memory-grid">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Queue Monitor -->
+                <div class="card">
+                    <div class="section-title" style="margin-bottom: 16px;">Active Scheduler Queue</div>
+                    <div class="queue-list" id="queue-container">
+                        <div style="text-align: center; color: var(--text-muted); padding: 16px;">No active requests in queue.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Radix Tree Cache & Streaming Console -->
+            <div class="right-column flex-column">
+                <!-- Radix Tree Card -->
+                <div class="card">
+                    <div class="section-title" style="margin-bottom: 16px;">Radix Tree Prefix Cache</div>
+                    <svg id="radix-svg">
+                        <!-- Rendered dynamically -->
+                    </svg>
+                </div>
+
+                <!-- Streaming Console -->
+                <div class="terminal-card">
+                    <div class="terminal-header">
+                        <span>Streaming logs & validation</span>
+                        <span id="ide-status" style="color: var(--accent-cyan);">Idle</span>
+                    </div>
+                    <div class="terminal-body" id="terminal-stream">> Console online. Waiting for inference submission...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        const svg = document.getElementById("radix-svg");
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = `${protocol}//${window.location.host}/api/telemetry`;
+            
+            socket = new WebSocket(wsUrl);
+            
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateDashboard(data);
+            };
+            
+            socket.onclose = function() {
+                setTimeout(connectWebSocket, 2000);
+            };
+        }
+
+        function updateDashboard(data) {
+            // 1. Update numeric stats
+            document.getElementById("stat-completed").innerText = data.queues.completed;
+            
+            const ttft_ms = data.metrics.avg_ttft_seconds * 1000;
+            document.getElementById("stat-ttft").innerText = `${ttft_ms.toFixed(1)} ms`;
+
+            const itl_ms = data.metrics.avg_itl_seconds * 1000;
+            document.getElementById("stat-itl").innerText = `${itl_ms.toFixed(1)} ms`;
+
+            const acc_pct = data.metrics.spec_acceptance_rate * 100;
+            document.getElementById("stat-acceptance").innerText = `${acc_pct.toFixed(1)}%`;
+
+            // 2. Capacity bar
+            const free = data.cache.free_blocks;
+            const total = data.cache.num_blocks;
+            const used_pct = ((total - free) / total) * 100;
+            document.getElementById("capacity-percentage").innerText = `${Math.round(used_pct)}%`;
+            document.getElementById("capacity-fill").style.width = `${used_pct}%`;
+
+            // 3. Update memory blocks
+            const grid = document.getElementById("memory-grid");
+            grid.innerHTML = "";
+            data.cache.block_status.forEach((status, idx) => {
+                const block = document.createElement("div");
+                block.className = `mem-block status-${status.replace("_", "-")}`;
+                block.innerHTML = `
+                    <span class="mem-block-id">${idx.toString().padStart(2, '0')}</span>
+                    <div class="mem-block-bar">
+                        <div class="mem-block-fill"></div>
+                    </div>
+                `;
+                grid.appendChild(block);
+            });
+
+            // 4. Update Scheduler Queue Monitor
+            const queueContainer = document.getElementById("queue-container");
+            if (data.requests.length === 0) {
+                queueContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px;">No active requests in queue.</div>`;
+            } else {
+                queueContainer.innerHTML = "";
+                data.requests.forEach(req => {
+                    const item = document.createElement("div");
+                    item.className = "queue-item";
+                    item.innerHTML = `
+                        <div class="queue-meta">
+                            <span class="queue-id">ID: ${req.id}</span>
+                            <span class="badge badge-${req.state}">${req.state}</span>
+                        </div>
+                        <div class="queue-stats">
+                            <span>Prompt: <span class="queue-stats-val">${req.prompt_len}</span></span>
+                            <span>Gen: <span class="queue-stats-val">${req.generated_len}</span></span>
+                            <span>Blocks: <span class="queue-stats-val">${req.allocated_blocks}</span></span>
+                        </div>
+                    `;
+                    queueContainer.appendChild(item);
+                });
+            }
+
+            // 5. Render SVG Radix Cache
+            renderRadixTreeSVG(data.cache.radix_tree);
+        }
+
+        function renderRadixTreeSVG(root) {
+            svg.innerHTML = "";
+            const width = svg.clientWidth || 300;
+            const height = svg.clientHeight || 280;
+            
+            const nodes = [];
+            const links = [];
+            
+            function layout(node, depth, xMin, xMax, parent = null) {
+                const nodeInfo = {
+                    tokens: node.tokens,
+                    phys_block_id: node.phys_block_id,
+                    ref_count: node.ref_count,
+                    x: (xMin + xMax) / 2,
+                    y: 40 + depth * 60,
+                    parent: parent
+                };
+                nodes.push(nodeInfo);
+                
+                if (parent) {
+                    links.push({ source: parent, target: nodeInfo });
+                }
+                
+                if (node.children && node.children.length > 0) {
+                    const step = (xMax - xMin) / node.children.length;
+                    node.children.forEach((child, idx) => {
+                        layout(child, depth + 1, xMin + idx * step, xMin + (idx + 1) * step, nodeInfo);
+                    });
+                }
+            }
+            
+            layout(root, 0, 0, width);
+
+            // Draw link connections
+            links.forEach(l => {
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const d = `M ${l.source.x} ${l.source.y} C ${l.source.x} ${(l.source.y + l.target.y)/2}, ${l.target.x} ${(l.source.y + l.target.y)/2}, ${l.target.x} ${l.target.y}`;
+                path.setAttribute("d", d);
+                path.setAttribute("class", l.target.ref_count > 0 ? "tree-link active" : "tree-link");
+                svg.appendChild(path);
+            });
+
+            // Draw circles and text
+            nodes.forEach(n => {
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute("class", "tree-node");
+                
+                const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                c.setAttribute("cx", n.x);
+                c.setAttribute("cy", n.y);
+                c.setAttribute("r", 12);
+                
+                let label = "R";
+                if (n.phys_block_id === null) {
+                    c.setAttribute("fill", "#64748b");
+                } else if (n.ref_count > 0) {
+                    c.setAttribute("fill", "var(--accent-cyan)");
+                    label = `B${n.phys_block_id}`;
+                } else {
+                    c.setAttribute("fill", "var(--color-cached-shared)");
+                    label = `B${n.phys_block_id}`;
+                }
+                g.appendChild(c);
+
+                const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                t.setAttribute("x", n.x);
+                t.setAttribute("y", n.y + 1);
+                t.setAttribute("fill", "#ffffff");
+                t.setAttribute("font-size", "7px");
+                t.setAttribute("font-family", "Fira Code");
+                t.setAttribute("font-weight", "600");
+                t.setAttribute("text-anchor", "middle");
+                t.setAttribute("dominant-baseline", "middle");
+                t.textContent = label;
+                g.appendChild(t);
+
+                if (n.tokens && n.tokens.length > 0) {
+                    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                    title.textContent = `Tokens: [${n.tokens.join(', ')}]\nRef count: ${n.ref_count}`;
+                    g.appendChild(title);
+                }
+
+                svg.appendChild(g);
+            });
+        }
+
+        async function submitPrompt() {
+            const prompt = document.getElementById("prompt-input").value;
+            if (!prompt.trim()) return;
+
+            const consoleStream = document.getElementById("terminal-stream");
+            const statusLabel = document.getElementById("ide-status");
+            
+            consoleStream.innerHTML = "> Query enqueued. Prefilling contexts...\n";
+            statusLabel.innerText = "Prefill";
+            statusLabel.style.color = "var(--accent-purple)";
+
+            const response = await fetch(`/submit_prompt`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: prompt, max_tokens: 32 })
+            });
+            await response.json();
+
+            const eventSource = new EventSource(`/generate?prompt=${encodeURIComponent(prompt)}&max_tokens=32`);
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.token) {
+                    statusLabel.innerText = "Speculative Decoding";
+                    statusLabel.style.color = "var(--accent-cyan)";
+                    
+                    const tokenClass = Math.random() > 0.85 ? "token-rejected" : (Math.random() > 0.7 ? "token-target" : "token-accepted");
+                    consoleStream.innerHTML += `<span class="token ${tokenClass}">${data.token}</span>`;
+                    consoleStream.scrollTop = consoleStream.scrollHeight;
+                } else if (data.status === "done") {
+                    statusLabel.innerText = "Completed";
+                    statusLabel.style.color = "var(--accent-green)";
+                    consoleStream.innerHTML += "\n\n> Generation completed successfully.";
+                    consoleStream.scrollTop = consoleStream.scrollHeight;
+                    eventSource.close();
+                }
+            };
+
+            eventSource.onerror = function() {
+                eventSource.close();
+            };
+        }
+
+        async function toggleSpeculative() {
+            const enable = document.getElementById("spec-toggle").checked;
+            await fetch(`/toggle_speculative`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enable: enable })
+            });
+        }
+
+        async function clearCompleted() {
+            await fetch(`/clear_completed`, { method: "POST" });
+        }
+
+        function simulateLoad() {
+            const prompts = [
+                "System: You are an expert database manager.\nUser: Write a query to deduplicate items.",
+                "System: You are an expert database manager.\nUser: Explain explain plans.",
+                "System: You are a friendly helpful chatbot.\nUser: Give me a joke about computer science.",
+                "System: You are a friendly helpful chatbot.\nUser: What is the history of AI?",
+                "System: You are an expert database manager.\nUser: What are database indexes?"
+            ];
+            
+            prompts.forEach((p, idx) => {
+                setTimeout(async () => {
+                    await fetch(`/submit_prompt`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt: p, max_tokens: 24 })
+                    });
+                }, idx * 400);
+            });
+        }
+
+        connectWebSocket();
+    </script>
+</body>
+</html>
