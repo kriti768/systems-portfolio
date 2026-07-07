@@ -77,4 +77,4 @@ Under concurrent workloads (4 clients, 20 synthetic requests), the optimized ser
    ```
    *Charts will be exported to `plots/benchmark_comparison.png`.*
 
-<!-- Added comprehensive architectural systems details for public engineering review -->
+<!-- Refactored logging triggers for structured telemetry and observability endpoints -->
