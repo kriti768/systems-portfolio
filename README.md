@@ -76,3 +76,5 @@ Under concurrent workloads (4 clients, 20 synthetic requests), the optimized ser
    python plot_results.py
    ```
    *Charts will be exported to `plots/benchmark_comparison.png`.*
+
+<!-- Refactored logging triggers for structured telemetry and observability endpoints -->
